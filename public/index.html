@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenRouter HTML Test Bench</title>
+  <!-- SEO & Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="logo-symbol">⎈</span>
+      <div class="logo-text">
+        <h1>OpenRouter HTML Test Bench</h1>
+        <span class="logo-subtitle">CREATIVE LAB & ARTIFACT EVALUATOR</span>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-indicator">
+        <span class="pulse-dot" id="server-status-dot"></span>
+        <span id="server-status-text">Server Offline</span>
+      </div>
+      <div class="active-config-pills">
+        <div class="config-pill" title="Generation Model">
+          <span class="pill-label">GEN:</span>
+          <span class="pill-value" id="pill-gen-model">Loading...</span>
+        </div>
+        <div class="config-pill" title="Extraction Model">
+          <span class="pill-label">EXT:</span>
+          <span class="pill-value" id="pill-ext-model">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- App Workspace Container -->
+  <div class="app-workspace">
+    
+    <!-- Sidebar: Settings & History -->
+    <aside class="workspace-sidebar">
+      
+      <!-- Settings Panel -->
+      <section class="sidebar-panel collapsible" id="panel-settings">
+        <div class="panel-header" onclick="togglePanel('panel-settings')">
+          <h2><span>⚙</span> Configuration & Settings</h2>
+          <span class="toggle-icon">▾</span>
+        </div>
+        <div class="panel-content">
+          <div class="form-group">
+            <label for="input-api-key">
+              OpenRouter API Key
+              <span class="label-hint">Saved in browser localStorage</span>
+            </label>
+            <div class="input-password-wrapper">
+              <input type="password" id="input-api-key" placeholder="sk-or-..." autocomplete="off">
+              <button class="btn-icon" type="button" id="btn-toggle-key" onclick="toggleKeyMask()" title="Show/Hide Key">👁</button>
+            </div>
+            <span class="key-source-info" id="key-source-text">Determining key source...</span>
+          </div>
+
+          <div class="form-group">
+            <label for="select-gen-model">
+              Generation Model
+              <span class="label-hint">Drafts the page content</span>
+            </label>
+            <div class="searchable-picker">
+              <input type="text" id="search-gen-model" placeholder="Search generation models..." onkeyup="filterModels('gen')">
+              <select id="select-gen-model" size="4" onchange="syncModelPicker('gen')">
+                <!-- Populated via API -->
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="select-ext-model">
+              Extraction Model
+              <span class="label-hint">Cleans and outputs index.html</span>
+            </label>
+            <div class="searchable-picker">
+              <input type="text" id="search-ext-model" placeholder="Search extraction models..." onkeyup="filterModels('ext')">
+              <select id="select-ext-model" size="4" onchange="syncModelPicker('ext')">
+                <!-- Populated via API -->
+              </select>
+            </div>
+          </div>
+
+          <button class="btn btn-secondary w-full" onclick="saveSettings()">Save Configuration</button>
+        </div>
+      </section>
+
+      <!-- History Panel -->
+      <section class="sidebar-panel flex-grow" id="panel-history">
+        <div class="panel-header">
+          <h2><span>🗂</span> Historical Runs</h2>
+          <button class="btn-refresh" onclick="loadHistoryList()" title="Refresh runs from disk">⟳</button>
+        </div>
+        <div class="runs-list-container" id="runs-list">
+          <div class="empty-state">No past runs found in runs/ folder.</div>
+        </div>
+      </section>
+      
+    </aside>
+
+    <!-- Main Workspace Split Panel -->
+    <main class="workspace-main">
+      
+      <!-- Left Split: Editor & Controls -->
+      <div class="workspace-column editor-column">
+        <div class="column-header">
+          <div class="column-title">
+            <h3><span>✍</span> Prompt Workspace</h3>
+            <span class="prompt-badge" id="prompt-file-badge">llm-landing.md</span>
+          </div>
+          <div class="column-actions">
+            <button class="btn btn-text btn-sm" onclick="loadDefaultPrompt()">Load Default</button>
+            <button class="btn btn-text btn-sm" onclick="clearPrompt()">Clear</button>
+          </div>
+        </div>
+        
+        <div class="editor-wrapper">
+          <div class="editor-gutter" id="editor-gutter">1</div>
+          <textarea id="prompt-textarea" placeholder="Paste your system or landing page prompt here..." onscroll="syncGutterScroll()" oninput="updateLineNumbers()"></textarea>
+        </div>
+
+        <div class="editor-controls">
+          <div class="test-name-wrapper">
+            <label for="input-test-name">Test Name Slug</label>
+            <input type="text" id="input-test-name" value="llm-landing" placeholder="e.g. customized-landing-page">
+          </div>
+          <button class="btn btn-primary" id="btn-run-test" onclick="executeRun()">
+            <span class="btn-symbol">⚡</span> Run Artifact Generation
+          </button>
+        </div>
+
+        <!-- Progress Steps Tracker -->
+        <div class="progress-tracker hidden" id="progress-container">
+          <div class="tracker-header">
+            <h4>Execution Pipeline Logs</h4>
+            <span class="pulse-indicator">● RUNNING</span>
+          </div>
+          <div class="tracker-steps">
+            <div class="tracker-step" id="step-validating_key">
+              <span class="step-icon">○</span>
+              <span class="step-label">Validating key credentials</span>
+            </div>
+            <div class="tracker-step" id="step-generating">
+              <span class="step-icon">○</span>
+              <span class="step-label">Generating with OpenRouter model</span>
+            </div>
+            <div class="tracker-step" id="step-extracting">
+              <span class="step-icon">○</span>
+              <span class="step-label">Extracting clean HTML artifact</span>
+            </div>
+            <div class="tracker-step" id="step-rendering">
+              <span class="step-icon">○</span>
+              <span class="step-label">Running Playwright smoke checks & screen capture</span>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- Right Split: Preview & Insights Tabs -->
+      <div class="workspace-column viewer-column">
+        
+        <!-- Tab Triggers -->
+        <div class="tabs-header">
+          <button class="tab-trigger active" onclick="switchTab('tab-preview')">
+            <span class="tab-icon">🖥</span> Live Preview
+          </button>
+          <button class="tab-trigger" onclick="switchTab('tab-smoke')">
+            <span class="tab-icon">⚙</span> Playwright Smoke Test
+          </button>
+          <button class="tab-trigger" onclick="switchTab('tab-html')">
+            <span class="tab-icon">&lt;/&gt;</span> Extracted HTML
+          </button>
+          <button class="tab-trigger" onclick="switchTab('tab-raw')">
+            <span class="tab-icon">🖨</span> Raw Response
+          </button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tabs-content-container">
+          
+          <!-- Tab: Live Preview -->
+          <div class="tab-content active" id="tab-preview">
+            <div class="preview-toolbar">
+              <div class="view-size-controls">
+                <button class="btn btn-secondary btn-xs active" onclick="setIframeWidth('100%')">Fullscreen</button>
+                <button class="btn btn-secondary btn-xs" onclick="setIframeWidth('1440px')">Desktop (1440px)</button>
+                <button class="btn btn-secondary btn-xs" onclick="setIframeWidth('1024px')">Tablet (1024px)</button>
+                <button class="btn btn-secondary btn-xs" onclick="setIframeWidth('375px')">Mobile (375px)</button>
+              </div>
+              <a href="#" id="action-open-tab" target="_blank" class="btn btn-primary btn-xs text-none">
+                Open in new tab ↗
+              </a>
+            </div>
+            <div class="preview-frame-wrapper" id="preview-wrapper">
+              <iframe id="preview-iframe" title="Interactive Render Preview" sandbox="allow-scripts allow-modals"></iframe>
+              <div class="preview-placeholder">
+                <span class="placeholder-icon">🖵</span>
+                <p>Run a prompt test to render the dynamic iframe preview</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Playwright Smoke Test -->
+          <div class="tab-content" id="tab-smoke">
+            <div class="smoke-report-grid">
+              
+              <!-- Metrics Table -->
+              <div class="smoke-card smoke-metrics">
+                <h4>Smoke Test Validation Metrics</h4>
+                <div class="metrics-table">
+                  <div class="metric-row">
+                    <span class="metric-label">Document Title:</span>
+                    <span class="metric-val" id="smoke-val-title">-</span>
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">Render Width & Height:</span>
+                    <span class="metric-val" id="smoke-val-dimensions">-</span>
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">Total HTML Elements:</span>
+                    <span class="metric-val" id="smoke-val-elements">-</span>
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">Body Text Length:</span>
+                    <span class="metric-val" id="smoke-val-text-length">-</span>
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">Console JS Errors:</span>
+                    <span class="metric-val" id="smoke-val-console-errs">-</span>
+                  </div>
+                  <div class="metric-row">
+                    <span class="metric-label">Page Load Errors:</span>
+                    <span class="metric-val" id="smoke-val-page-errs">-</span>
+                  </div>
+                </div>
+
+                <div class="smoke-console-logs hidden" id="smoke-console-container">
+                  <h5>Console Errors Captured</h5>
+                  <pre id="smoke-console-text"></pre>
+                </div>
+              </div>
+
+              <!-- Screenshot Preview -->
+              <div class="smoke-card smoke-screenshot">
+                <h4>Automated Screenshot (Playwright Capture)</h4>
+                <div class="screenshot-container" id="screenshot-view">
+                  <div class="empty-screenshot-placeholder">No screenshot taken yet. Run a test.</div>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+
+          <!-- Tab: Extracted HTML -->
+          <div class="tab-content code-tab" id="tab-html">
+            <div class="code-toolbar">
+              <span class="code-size-label" id="html-size-label">0 lines</span>
+              <button class="btn btn-secondary btn-xs" onclick="copyToClipboard('html-code-pre')">Copy Code</button>
+            </div>
+            <div class="code-viewer-wrapper">
+              <pre><code id="html-code-pre">Run a model generation test to output the clean index.html code.</code></pre>
+            </div>
+          </div>
+
+          <!-- Tab: Raw Response -->
+          <div class="tab-content code-tab" id="tab-raw">
+            <div class="code-toolbar">
+              <span class="code-size-label" id="raw-size-label">0 lines</span>
+              <button class="btn btn-secondary btn-xs" onclick="copyToClipboard('raw-response-pre')">Copy Raw</button>
+            </div>
+            <div class="code-viewer-wrapper">
+              <pre><code id="raw-response-pre">Run a model generation test to output the raw response here.</code></pre>
+            </div>
+          </div>
+          
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Global Error Overlay -->
+  <div class="toast-error hidden" id="error-toast">
+    <div class="toast-content">
+      <span class="toast-warning-symbol">⚠️</span>
+      <div class="toast-text-wrapper">
+        <strong id="toast-title">Execution Error</strong>
+        <p id="toast-desc">Details go here.</p>
+      </div>
+      <button class="toast-close" onclick="hideError()">×</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
